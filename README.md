@@ -157,8 +157,9 @@ make size     # bundle size against the budget
 make clean    # reclaim target/ — the only thing here that grows
 ```
 
-`make clean` matters. A Rust `target/` directory reaches a gigabyte or two; the checkout
-itself is under a megabyte without it.
+`make clean` matters. Measured on this repo: **1.9 GB with `target/`, 580 KB after
+`make distclean`.** The source itself is 192 KB. Rust build artefacts are the only thing here
+that grows, and they are entirely disposable — a rebuild takes under a minute.
 
 ## Architecture
 
@@ -168,7 +169,7 @@ POST /mcp    ─┼─► Cloudflare Worker (Rust → WASM) ─┬─► BMKG (3
 GET  /       ─┘                                    └─► D1 (91,599 regions + 130,023 tokens)
 ```
 
-Roughly 1,900 lines of Rust. The bundle is ~280 KB gzipped and starts in about 8 ms.
+About 2,300 lines of Rust. The bundle is 802 KB of wasm — 281 KB gzipped — and starts in 8 ms.
 
 Region search uses a token table rather than `LIKE '%x%'`: a full scan would read 91,599 rows
 per query, and D1's free tier is billed in rows read, so that would run out at around 55
