@@ -1,0 +1,30 @@
+[package]
+name    = "bmkg-edge"
+version = "1.0.0"
+edition = "2021"
+authors = ["Dedi Irawan"]
+license = "MIT"
+description = "BMKG open data as a typed REST + MCP API, on one Cloudflare Worker."
+repository  = "https://github.com/galohot/bmkg-edge"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+worker        = { version = "0.8", features = ["d1"] }
+worker-macros = "0.8"
+serde         = { version = "1", features = ["derive"] }
+serde_json    = "1"
+quick-xml     = "0.42"
+
+[profile.release]
+opt-level     = "z"
+lto           = true
+codegen-units = 1
+
+# Two settings are deliberately ABSENT, both of which break the wasm-bindgen step with
+# "externref table required for catch wrappers":
+#   strip = true   — strips the `target_features` custom section, so wasm-bindgen cannot
+#                    see that reference-types is available and refuses to emit wrappers.
+#   panic = "abort" — removes the unwinding machinery those wrappers are generated against.
+# Size is recovered by opt-level "z" + LTO + the wasm-opt -Oz pass worker-build runs.

@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bmkg-edge — BMKG open data as a JSON API</title>
+<meta name="description" content="Indonesian earthquake, weather and severe-weather-warning data from BMKG, as a typed JSON API. No key, no account. MCP endpoint included.">
+<style>
+:root{
+  --bg:#ffffff; --bg-2:#f5f5f7; --card:#ffffff; --line:#d2d2d7;
+  --ink:#1d1d1f; --ink-2:#6e6e73; --ink-3:#86868b;
+  --accent:#0071e3; --accent-ink:#ffffff;
+  --ok:#1d8a4e; --warn:#a15c00; --code-bg:#f5f5f7;
+  --radius:12px; --radius-sm:8px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#000000; --bg-2:#1c1c1e; --card:#1c1c1e; --line:#38383a;
+    --ink:#f5f5f7; --ink-2:#aeaeb2; --ink-3:#8e8e93;
+    --accent:#0a84ff; --accent-ink:#ffffff;
+    --ok:#30d158; --warn:#ff9f0a; --code-bg:#2c2c2e;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:17px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:860px; margin:0 auto; padding:0 22px}
+a{color:var(--accent); text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+header{padding:72px 0 40px; border-bottom:1px solid var(--line)}
+h1{font-size:44px; line-height:1.1; letter-spacing:-.02em; margin:0 0 12px; font-weight:600}
+.lede{font-size:21px; color:var(--ink-2); margin:0 0 24px; max-width:40em}
+.badges{display:flex; flex-wrap:wrap; gap:8px}
+.badge{
+  display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:500;
+  padding:5px 11px; border-radius:100px; border:1px solid var(--line); color:var(--ink-2);
+  background:var(--bg-2);
+}
+.badge.live{color:var(--ok); border-color:var(--ok)}
+.dot{width:7px; height:7px; border-radius:50%; background:currentColor}
+
+section{padding:44px 0; border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:none}
+h2{font-size:28px; letter-spacing:-.01em; margin:0 0 10px; font-weight:600}
+h3{font-size:19px; margin:32px 0 10px; font-weight:600}
+p{margin:0 0 14px; color:var(--ink-2); max-width:44em}
+p strong{color:var(--ink); font-weight:600}
+ul{margin:0 0 14px; padding-left:22px; color:var(--ink-2); max-width:44em}
+li{margin:0 0 7px}
+
+.note{
+  border:1px solid var(--line); border-left:3px solid var(--warn);
+  border-radius:var(--radius-sm); padding:14px 16px; background:var(--bg-2); margin:0 0 20px;
+}
+.note p{margin:0; color:var(--ink)}
+
+table{width:100%; border-collapse:collapse; margin:0 0 20px; font-size:15px}
+th,td{text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+th{font-weight:600; color:var(--ink-3); font-size:13px; text-transform:uppercase; letter-spacing:.04em}
+td code{font-size:13.5px}
+
+.ep{border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; margin:0 0 12px; background:var(--card)}
+.ep-head{display:flex; align-items:center; gap:10px; padding:12px 14px; flex-wrap:wrap}
+.verb{
+  font-size:11px; font-weight:700; letter-spacing:.06em; padding:3px 7px; border-radius:5px;
+  background:var(--accent); color:var(--accent-ink);
+}
+.verb.post{background:var(--ink)}
+.route{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:14.5px; font-weight:500}
+.ep-desc{padding:0 14px 12px; color:var(--ink-2); font-size:15px; margin:0}
+.ep-try{
+  display:flex; align-items:center; gap:8px; padding:10px 14px;
+  border-top:1px solid var(--line); background:var(--bg-2); flex-wrap:wrap;
+}
+.ep-try code{font-size:13px; color:var(--ink-2); word-break:break-all; flex:1 1 240px}
+.btn{
+  appearance:none; border:1px solid var(--line); background:var(--card); color:var(--ink);
+  font:inherit; font-size:13px; font-weight:500; padding:5px 12px; border-radius:100px; cursor:pointer;
+}
+.btn:hover{border-color:var(--accent); color:var(--accent)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.btn.primary:hover{opacity:.85; color:var(--accent-ink)}
+
+pre{
+  background:var(--code-bg); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:14px 16px; overflow-x:auto; font-size:13.5px; line-height:1.55; margin:0 0 16px;
+}
+pre code{color:var(--ink)}
+p code, li code, td code{
+  background:var(--code-bg); border-radius:5px; padding:1px 5px; font-size:.9em;
+}
+
+footer{padding:36px 0 60px; color:var(--ink-3); font-size:14px}
+footer p{color:var(--ink-3); font-size:14px}
+
+@media (max-width:640px){
+  header{padding:48px 0 32px}
+  h1{font-size:34px}
+  .lede{font-size:18px}
+  h2{font-size:23px}
+  body{font-size:16px}
+  table{font-size:14px}
+  th,td{padding:8px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>bmkg-edge</h1>
+    <p class="lede">Indonesian earthquake, weather and severe-weather-warning data from BMKG,
+    as a typed JSON API. No key, no account, CORS open.</p>
+    <div class="badges">
+      <span class="badge live"><span class="dot"></span>Live</span>
+      <span class="badge">Rust on Cloudflare Workers</span>
+      <span class="badge">MCP endpoint</span>
+      <span class="badge">MIT</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Why this exists</h2>
+    <p>BMKG publishes its data openly, but raw: numbers arrive as strings, dates in three
+    formats, and warnings as CAP XML. The Python project most people point at solved that and
+    then its hosting lapsed — the demo answers <code>503 DEPLOYMENT_PAUSED</code>, and its MCP
+    server proxies every tool call to that dead demo, so the tools all fail.</p>
+    <p>This is the same API with nothing that can lapse. <strong>No origin server, no paid plan,
+    no machine to keep awake.</strong> One Cloudflare Worker serves the REST API, the MCP
+    endpoint and this page.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Response shape</h2>
+    <p>Every endpoint answers the same way, so you write one parser.</p>
+<pre><code>{ "ok": true,  "data": …, "meta": { "source": …, "cached_seconds": 60, "generated_at": … } }
+{ "ok": false, "error": { "code": "upstream_not_found", "message": "…" } }</code></pre>
+    <p>A 404 from BMKG becomes <code>upstream_not_found</code>, never an empty
+    <code>200</code>. If BMKG changes a payload shape, you get <code>upstream_parse</code>
+    naming the URL — not silently wrong numbers.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Earthquakes</h2>
+    <p>Magnitude and depth come back as JSON numbers. Coordinates are split into
+    <code>latitude</code> and <code>longitude</code>. Times are ISO 8601.</p>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/earthquake/latest</span></div>
+      <p class="ep-desc">The most recent earthquake anywhere in Indonesia.</p>
+      <div class="ep-try"><code data-url="/v1/earthquake/latest"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/earthquake/latest">Run</a></div>
+    </div>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/earthquake/recent</span></div>
+      <p class="ep-desc">The last 15 quakes of magnitude 5.0 or greater.</p>
+      <div class="ep-try"><code data-url="/v1/earthquake/recent"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/earthquake/recent">Run</a></div>
+    </div>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/earthquake/felt</span></div>
+      <p class="ep-desc">Quakes people reported feeling, with MMI intensity per place.</p>
+      <div class="ep-try"><code data-url="/v1/earthquake/felt"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/earthquake/felt">Run</a></div>
+    </div>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/earthquake/nearby</span></div>
+      <p class="ep-desc">Quakes within <code>radius_km</code> of a point, nearest first, each with
+      its distance. Defaults to 500 km.</p>
+      <div class="ep-try"><code data-url="/v1/earthquake/nearby?lat=-6.2&amp;lon=106.8&amp;radius_km=800"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/earthquake/nearby?lat=-6.2&amp;lon=106.8&amp;radius_km=800">Run</a></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Weather</h2>
+    <p>BMKG keys forecasts by <code>adm4</code>, the Kemendagri village code. Three days of
+    roughly 3-hourly slots, flattened into one ordered array.</p>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/weather/search?q=</span></div>
+      <p class="ep-desc"><strong>Start here.</strong> Give it a place name and it resolves the code
+      and returns the forecast in one call — plus what else the name could have meant.</p>
+      <div class="ep-try"><code data-url="/v1/weather/search?q=tebet"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/weather/search?q=tebet">Run</a></div>
+    </div>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/weather/{adm4}</span></div>
+      <p class="ep-desc">Three-day forecast for one village.</p>
+      <div class="ep-try"><code data-url="/v1/weather/31.74.04.1006"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/weather/31.74.04.1006">Run</a></div>
+    </div>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/weather/{adm4}/current</span></div>
+      <p class="ep-desc">The slot covering right now, plus the next three.</p>
+      <div class="ep-try"><code data-url="/v1/weather/31.74.04.1006/current"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/weather/31.74.04.1006/current">Run</a></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Severe-weather warnings</h2>
+    <p>BMKG's nowcast feed. Detail responses carry the affected area as a polygon in
+    <strong>GeoJSON order</strong> — <code>[longitude, latitude]</code>. CAP publishes
+    <code>lat,lon</code>; the swap happens here so you can hand it straight to a map.</p>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/nowcast</span></div>
+      <p class="ep-desc">All active warnings. <code>?lang=id</code> for Indonesian.</p>
+      <div class="ep-try"><code data-url="/v1/nowcast"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/nowcast">Run</a></div>
+    </div>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/nowcast/check?location=</span></div>
+      <p class="ep-desc">Warnings that mention a place. A text match over the live warning list.</p>
+      <div class="ep-try"><code data-url="/v1/nowcast/check?location=jambi"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/nowcast/check?location=jambi">Run</a></div>
+    </div>
+
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/nowcast/{alert_code}</span></div>
+      <p class="ep-desc">Full CAP detail: severity, urgency, certainty, validity window, polygon.
+      Take the code from <code>/v1/nowcast</code>.</p>
+      <div class="ep-try"><code data-url="/v1/nowcast"></code>
+        <button class="btn" data-copy>Copy</button></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Regions</h2>
+    <div class="note">
+      <p><strong>38 provinces, not 34.</strong> Indonesia split Papua into six provinces in 2022 and
+      BMKG followed. The old Merauke code <code>91.01.01.2001</code> now returns 404 upstream;
+      the current <code>93.01.01.2001</code> is the same village. This API uses the current
+      Kemendagri list, so Papua works.</p>
+    </div>
+    <table>
+      <tr><th>Route</th><th>Returns</th></tr>
+      <tr><td><code>/v1/wilayah/provinces</code></td><td>All 38 provinces</td></tr>
+      <tr><td><code>/v1/wilayah/districts?province_code=31</code></td><td>Kabupaten/kota</td></tr>
+      <tr><td><code>/v1/wilayah/subdistricts?district_code=31.74</code></td><td>Kecamatan</td></tr>
+      <tr><td><code>/v1/wilayah/villages?subdistrict_code=31.74.04</code></td><td>Desa/kelurahan</td></tr>
+      <tr><td><code>/v1/wilayah/search?q=tebet</code></td><td>Any level, with full path</td></tr>
+    </table>
+    <div class="ep">
+      <div class="ep-head"><span class="verb">GET</span><span class="route">/v1/wilayah/search</span></div>
+      <p class="ep-desc">Word-prefix search across all four levels. Each hit carries its full path,
+      because a village name alone is ambiguous.</p>
+      <div class="ep-try"><code data-url="/v1/wilayah/search?q=pejaten"></code>
+        <button class="btn" data-copy>Copy</button><a class="btn primary" href="/v1/wilayah/search?q=pejaten">Run</a></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>MCP — use it from an AI assistant</h2>
+    <p>The same handlers, exposed as 12 tools over the Model Context Protocol. The tools run
+    <em>inside</em> this Worker, so there is no second service to go down.</p>
+    <h3>Claude Code</h3>
+<pre><code>claude mcp add --transport http bmkg https://bmkg.irawan.dev/mcp</code></pre>
+    <h3>Claude Desktop, Cursor, VS Code</h3>
+<pre><code>{
+  "mcpServers": {
+    "bmkg": { "url": "https://bmkg.irawan.dev/mcp" }
+  }
+}</code></pre>
+    <p>Tools: <code>get_latest_earthquake</code>, <code>get_recent_earthquakes</code>,
+    <code>get_felt_earthquakes</code>, <code>get_nearby_earthquakes</code>,
+    <code>find_weather</code>, <code>get_weather_forecast</code>,
+    <code>get_current_weather</code>, <code>get_weather_warnings</code>,
+    <code>check_location_warnings</code>, <code>get_warning_detail</code>,
+    <code>search_regions</code>, <code>list_regions</code>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Caching and limits</h2>
+    <p>Responses are cached at Cloudflare's edge and carry a matching
+    <code>Cache-Control</code>. There is no API key and no rate limit of our own.</p>
+    <table>
+      <tr><th>Route</th><th>Cached</th></tr>
+      <tr><td>Latest and felt earthquakes</td><td>60 s</td></tr>
+      <tr><td>Recent M5.0+ earthquakes</td><td>5 min</td></tr>
+      <tr><td>Weather forecasts</td><td>10 min</td></tr>
+      <tr><td>Warning index</td><td>2 min</td></tr>
+      <tr><td>Warning detail</td><td>15 min</td></tr>
+      <tr><td>Region lookups</td><td>24 h</td></tr>
+    </table>
+    <p>Machine-readable spec: <a href="/v1/openapi.json">/v1/openapi.json</a> ·
+    Health: <a href="/health">/health</a></p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Self-host it</h2>
+    <p>It is one Worker and one D1 database. Both fit inside Cloudflare's free tier.</p>
+<pre><code>git clone https://github.com/galohot/bmkg-edge
+cd bmkg-edge
+cp wrangler.example.toml wrangler.toml     # add your account and D1 ids
+python3 tools/build-wilayah.py             # build the region seed
+make seed                                  # load it into D1
+make deploy</code></pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Data from <a href="https://data.bmkg.go.id">BMKG</a>, Indonesia's Agency for Meteorology,
+    Climatology and Geophysics — public domain. Region codes from
+    <a href="https://github.com/cahyadsn/wilayah">cahyadsn/wilayah</a> (MIT), tracking Kepmendagri
+    300.2.2-2430/2025.</p>
+    <p>This service is not affiliated with or endorsed by BMKG. It reads their public feeds and
+    reshapes them. For anything life-safety critical, use BMKG directly.</p>
+    <p><a href="https://github.com/galohot/bmkg-edge">Source</a> · MIT · <span id="ver"></span></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var origin = location.origin;
+  document.querySelectorAll('code[data-url]').forEach(function (el) {
+    el.textContent = 'curl ' + origin + el.getAttribute('data-url');
+  });
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var code = btn.parentElement.querySelector('code');
+      if (!code) return;
+      navigator.clipboard.writeText(code.textContent).then(function () {
+        var was = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = was; }, 1400);
+      });
+    });
+  });
+  fetch('/health').then(function (r) { return r.json(); }).then(function (d) {
+    var v = document.getElementById('ver');
+    if (v && d && d.data && d.data.version) v.textContent = 'v' + d.data.version;
+  }).catch(function () {});
+})();
+</script>
+</body>
+</html>

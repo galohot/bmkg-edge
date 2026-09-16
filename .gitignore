@@ -1,0 +1,19 @@
+# Cloudflare account and resource ids live here — never tracked.
+wrangler.toml
+
+/target
+/build
+.wrangler/
+
+# Generated: rebuild with `python3 tools/build-wilayah.py`
+data/wilayah.source.sql
+data/wilayah.seed.sql
+
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Internal working doc: points at the gitignored .claude/ tree and names local paths.
+/CLAUDE.md

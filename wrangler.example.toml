@@ -1,0 +1,25 @@
+# Copy to wrangler.toml and fill in your own ids.
+#
+# wrangler.toml itself is gitignored on purpose: account and database ids are
+# infrastructure identifiers and tracked files here are treated as public.
+
+name                = "bmkg-edge"
+main                = "build/worker/shim.mjs"
+compatibility_date  = "2026-09-01"
+account_id          = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+
+[build]
+command = "worker-build --release"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "bmkg-wilayah"
+database_id   = "YOUR_D1_DATABASE_ID"
+
+# Uncomment once the DNS record exists in your zone.
+# [[routes]]
+# pattern       = "bmkg.example.com"
+# custom_domain = true
