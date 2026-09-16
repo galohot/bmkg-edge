@@ -114,10 +114,9 @@ fn parse_rss(xml: &str, language: &str) -> ApiResult<Vec<Alert>> {
     let mut item = RawItem::default();
 
     loop {
-        match reader
-            .read_event()
-            .map_err(|e| ApiError::UpstreamParse(format!("BMKG alert feed is not valid XML: {e}")))?
-        {
+        match reader.read_event().map_err(|e| {
+            ApiError::UpstreamParse(format!("BMKG alert feed is not valid XML: {e}"))
+        })? {
             Event::Start(e) => {
                 let name = local(e.name().as_ref());
                 if name == "item" {
@@ -247,10 +246,9 @@ fn parse_cap(xml: &str, code: &str) -> ApiResult<AlertDetail> {
     let mut text = String::new();
 
     loop {
-        match reader
-            .read_event()
-            .map_err(|e| ApiError::UpstreamParse(format!("CAP file {code} is not valid XML: {e}")))?
-        {
+        match reader.read_event().map_err(|e| {
+            ApiError::UpstreamParse(format!("CAP file {code} is not valid XML: {e}"))
+        })? {
             Event::Start(e) => {
                 let name = local(e.name().as_ref());
                 if name == "area" {
@@ -411,7 +409,9 @@ pub async fn check(query: &str, language: &str) -> ApiResult<Vec<Alert>> {
         .filter(|a| {
             a.headline.to_uppercase().contains(&needle)
                 || a.description.to_uppercase().contains(&needle)
-                || a.area.as_deref().is_some_and(|x| x.to_uppercase().contains(&needle))
+                || a.area
+                    .as_deref()
+                    .is_some_and(|x| x.to_uppercase().contains(&needle))
         })
         .collect())
 }

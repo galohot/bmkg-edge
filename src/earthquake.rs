@@ -109,22 +109,23 @@ impl Raw {
                 Ok((lat, lon))
             })?;
 
-        let magnitude = self
-            .magnitude
-            .trim()
-            .parse::<f64>()
-            .map_err(|e| ApiError::UpstreamParse(format!("Magnitude {:?}: {e}", self.magnitude)))?;
+        let magnitude =
+            self.magnitude.trim().parse::<f64>().map_err(|e| {
+                ApiError::UpstreamParse(format!("Magnitude {:?}: {e}", self.magnitude))
+            })?;
 
         // "145 km" -> 145.0. BMKG has also used "10 Km" and "5  km" over the years,
         // so take the leading number rather than stripping a fixed suffix.
         let depth_km = self
             .kedalaman
-            .trim()
             .split_whitespace()
             .next()
             .and_then(|n| n.replace(',', ".").parse::<f64>().ok())
             .ok_or_else(|| {
-                ApiError::UpstreamParse(format!("Kedalaman {:?} has no leading number", self.kedalaman))
+                ApiError::UpstreamParse(format!(
+                    "Kedalaman {:?} has no leading number",
+                    self.kedalaman
+                ))
             })?;
 
         Ok(Quake {

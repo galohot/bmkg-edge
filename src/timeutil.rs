@@ -64,7 +64,10 @@ mod tests {
     #[test]
     fn a_bmkg_slot() {
         // 2026-09-16T04:00:00Z
-        assert_eq!(iso_to_epoch_ms("2026-09-16T04:00:00Z"), Some(1_789_531_200_000));
+        assert_eq!(
+            iso_to_epoch_ms("2026-09-16T04:00:00Z"),
+            Some(1_789_531_200_000)
+        );
     }
 
     #[test]
@@ -86,7 +89,10 @@ mod tests {
 
     #[test]
     fn leap_day() {
-        assert_eq!(iso_to_epoch_ms("2024-02-29T00:00:00Z"), Some(1_709_164_800_000));
+        assert_eq!(
+            iso_to_epoch_ms("2024-02-29T00:00:00Z"),
+            Some(1_709_164_800_000)
+        );
     }
 
     #[test]

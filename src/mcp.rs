@@ -51,10 +51,7 @@ async fn dispatch(msg: &Value, env: &Env) -> Option<Value> {
     let params = msg.get("params").cloned().unwrap_or(json!({}));
 
     // No id means a notification: act, answer nothing.
-    if id.is_none() {
-        return None;
-    }
-    let id = id.unwrap();
+    let id = id?;
 
     let result: std::result::Result<Value, Value> = match method {
         "initialize" => Ok(json!({
@@ -131,8 +128,13 @@ async fn run_tool(name: &str, args: &Value, env: &Env) -> std::result::Result<Va
         "get_recent_earthquakes" => to_value(earthquake::recent().await?),
         "get_felt_earthquakes" => to_value(earthquake::felt().await?),
         "get_nearby_earthquakes" => {
-            let radius = args.get("radius_km").and_then(Value::as_f64).unwrap_or(500.0);
-            to_value(earthquake::nearby(num_arg(args, "lat")?, num_arg(args, "lon")?, radius).await?)
+            let radius = args
+                .get("radius_km")
+                .and_then(Value::as_f64)
+                .unwrap_or(500.0);
+            to_value(
+                earthquake::nearby(num_arg(args, "lat")?, num_arg(args, "lon")?, radius).await?,
+            )
         }
         "get_weather_forecast" => to_value(weather::forecast(str_arg(args, "adm4")?).await?),
         "get_current_weather" => to_value(weather::current(str_arg(args, "adm4")?).await?),
@@ -302,7 +304,10 @@ fn headers() -> Result<Headers> {
     h.set("content-type", "text/event-stream")?;
     h.set("cache-control", "no-store")?;
     h.set("access-control-allow-origin", "*")?;
-    h.set("access-control-allow-headers", "content-type, mcp-session-id, mcp-protocol-version")?;
+    h.set(
+        "access-control-allow-headers",
+        "content-type, mcp-session-id, mcp-protocol-version",
+    )?;
     h.set("access-control-allow-methods", "POST, GET, OPTIONS")?;
     Ok(h)
 }

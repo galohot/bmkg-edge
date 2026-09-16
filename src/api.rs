@@ -204,6 +204,7 @@ pub async fn fetch_text(url: &str, ttl: u32) -> ApiResult<String> {
 /// error naming the URL — the signal that BMKG changed and this crate must follow.
 pub async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str, ttl: u32) -> ApiResult<T> {
     let body = fetch_text(url, ttl).await?;
-    serde_json::from_str(&body)
-        .map_err(|e| ApiError::UpstreamParse(format!("{url}: {e} (BMKG changed its payload shape)")))
+    serde_json::from_str(&body).map_err(|e| {
+        ApiError::UpstreamParse(format!("{url}: {e} (BMKG changed its payload shape)"))
+    })
 }

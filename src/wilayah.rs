@@ -61,7 +61,11 @@ pub async fn provinces(db: &D1Database) -> ApiResult<Vec<Region>> {
 
 /// Direct children of `parent_code`. Serves districts, subdistricts and villages —
 /// they differ only in which level the caller passes in, so one query covers all three.
-pub async fn children(db: &D1Database, parent_code: &str, expect_level: u8) -> ApiResult<Vec<Region>> {
+pub async fn children(
+    db: &D1Database,
+    parent_code: &str,
+    expect_level: u8,
+) -> ApiResult<Vec<Region>> {
     validate_code(parent_code)?;
     let rows = query(
         db,
@@ -96,7 +100,12 @@ pub async fn get(db: &D1Database, code: &str) -> ApiResult<Region> {
 /// finds it too. The range bound (`>= q AND < q+\u{FFFF}`) is deliberate: SQLite only
 /// uses an index for `LIKE` under conditions D1 does not guarantee, but a range
 /// comparison always does.
-pub async fn search(db: &D1Database, q: &str, limit: u32, level: Option<u8>) -> ApiResult<Vec<Region>> {
+pub async fn search(
+    db: &D1Database,
+    q: &str,
+    limit: u32,
+    level: Option<u8>,
+) -> ApiResult<Vec<Region>> {
     let norm = normalise(q);
     if norm.len() < 2 {
         return Err(ApiError::BadRequest(

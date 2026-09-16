@@ -61,7 +61,11 @@ fn is_storable(res: &Response) -> bool {
 
 async fn route(mut req: Request, env: Env) -> Result<Response> {
     let path = req.path();
-    let segments: Vec<&str> = path.trim_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+    let segments: Vec<&str> = path
+        .trim_matches('/')
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
 
     if req.method() == Method::Post {
         return match segments.as_slice() {
@@ -84,15 +88,21 @@ async fn route(mut req: Request, env: Env) -> Result<Response> {
         ["v1", "openapi.json"] => openapi::document(),
 
         // ---- earthquake
-        ["v1", "earthquake", "latest"] => {
-            respond(earthquake::latest().await, "BMKG autogempa", earthquake::TTL_LATEST)
-        }
-        ["v1", "earthquake", "recent"] => {
-            respond(earthquake::recent().await, "BMKG gempaterkini", earthquake::TTL_RECENT)
-        }
-        ["v1", "earthquake", "felt"] => {
-            respond(earthquake::felt().await, "BMKG gempadirasakan", earthquake::TTL_FELT)
-        }
+        ["v1", "earthquake", "latest"] => respond(
+            earthquake::latest().await,
+            "BMKG autogempa",
+            earthquake::TTL_LATEST,
+        ),
+        ["v1", "earthquake", "recent"] => respond(
+            earthquake::recent().await,
+            "BMKG gempaterkini",
+            earthquake::TTL_RECENT,
+        ),
+        ["v1", "earthquake", "felt"] => respond(
+            earthquake::felt().await,
+            "BMKG gempadirasakan",
+            earthquake::TTL_FELT,
+        ),
         ["v1", "earthquake", "nearby"] => {
             let lat = num_param(&req, "lat");
             let lon = num_param(&req, "lon");
@@ -104,7 +114,8 @@ async fn route(mut req: Request, env: Env) -> Result<Response> {
                     earthquake::TTL_RECENT,
                 ),
                 (None, _, _) | (_, None, _) => json_err(&ApiError::BadRequest(
-                    "lat and lon are required, e.g. /v1/earthquake/nearby?lat=-6.2&lon=106.8".into(),
+                    "lat and lon are required, e.g. /v1/earthquake/nearby?lat=-6.2&lon=106.8"
+                        .into(),
                 )),
                 _ => json_err(&ApiError::BadRequest(
                     "lat, lon and radius_km must be numbers".into(),
@@ -119,18 +130,26 @@ async fn route(mut req: Request, env: Env) -> Result<Response> {
                     Ok(db) => db,
                     Err(e) => return json_err(&e),
                 };
-                respond(weather::search(&db, &q).await, "BMKG prakiraan-cuaca", weather::TTL)
+                respond(
+                    weather::search(&db, &q).await,
+                    "BMKG prakiraan-cuaca",
+                    weather::TTL,
+                )
             }
             None => json_err(&ApiError::BadRequest(
                 "q is required, e.g. /v1/weather/search?q=tebet".into(),
             )),
         },
-        ["v1", "weather", adm4] => {
-            respond(weather::forecast(adm4).await, "BMKG prakiraan-cuaca", weather::TTL)
-        }
-        ["v1", "weather", adm4, "current"] => {
-            respond(weather::current(adm4).await, "BMKG prakiraan-cuaca", weather::TTL)
-        }
+        ["v1", "weather", adm4] => respond(
+            weather::forecast(adm4).await,
+            "BMKG prakiraan-cuaca",
+            weather::TTL,
+        ),
+        ["v1", "weather", adm4, "current"] => respond(
+            weather::current(adm4).await,
+            "BMKG prakiraan-cuaca",
+            weather::TTL,
+        ),
 
         // ---- nowcast. `check` before the code, same reason.
         ["v1", "nowcast"] => respond(
@@ -177,9 +196,15 @@ async fn wilayah_route(req: &Request, env: &Env, rest: &[&str]) -> Result<Respon
         ["villages"] => child_route(req, &db, "subdistrict_code", 4).await,
         ["search"] => match param(req, "q") {
             Some(q) => {
-                let limit = param(req, "limit").and_then(|s| s.parse().ok()).unwrap_or(10);
+                let limit = param(req, "limit")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(10);
                 let level = param(req, "level").and_then(|s| s.parse().ok());
-                respond(wilayah::search(&db, &q, limit, level).await, SRC, wilayah::TTL)
+                respond(
+                    wilayah::search(&db, &q, limit, level).await,
+                    SRC,
+                    wilayah::TTL,
+                )
             }
             None => json_err(&ApiError::BadRequest(
                 "q is required, e.g. /v1/wilayah/search?q=tebet".into(),

@@ -243,7 +243,7 @@ pub async fn current(adm4: &str) -> ApiResult<Current> {
     let mut best_started: Option<(usize, i64)> = None;
     for (i, s) in f.slots.iter().enumerate() {
         if let Some(ms) = iso_to_epoch_ms(&s.datetime) {
-            if ms <= now_ms && best_started.map_or(true, |(_, b)| ms > b) {
+            if ms <= now_ms && best_started.is_none_or(|(_, b)| ms > b) {
                 best_started = Some((i, ms));
             }
         }
