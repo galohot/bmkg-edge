@@ -115,11 +115,12 @@ footer p{color:var(--ink-3); font-size:14px}
 <header>
   <div class="wrap">
     <h1>bmkg-edge</h1>
-    <p class="lede">Indonesian earthquake, weather and severe-weather-warning data from BMKG,
-    as a typed JSON API. No key, no account, CORS open.</p>
+    <p class="lede">The shared BMKG layer for our projects. Indonesian earthquake, weather and
+    severe-weather-warning data, parsed once, here, so nothing downstream parses it again.</p>
     <div class="badges">
       <span class="badge live"><span class="dot"></span>Live</span>
       <span class="badge">Rust on Cloudflare Workers</span>
+      <span class="badge">TypeScript client</span>
       <span class="badge">MCP endpoint</span>
       <span class="badge">MIT</span>
     </div>
@@ -129,13 +130,17 @@ footer p{color:var(--ink-3); font-size:14px}
 <section>
   <div class="wrap">
     <h2>Why this exists</h2>
-    <p>BMKG publishes its data openly, but raw: numbers arrive as strings, dates in three
-    formats, and warnings as CAP XML. The Python project most people point at solved that and
-    then its hosting lapsed — the demo answers <code>503 DEPLOYMENT_PAUSED</code>, and its MCP
-    server proxies every tool call to that dead demo, so the tools all fail.</p>
-    <p>This is the same API with nothing that can lapse. <strong>No origin server, no paid plan,
-    no machine to keep awake.</strong> One Cloudflare Worker serves the REST API, the MCP
-    endpoint and this page.</p>
+    <p>BMKG publishes its data openly, but raw: numbers arrive as strings, one field holds
+    <code>"lat,lon"</code> as text, forecasts nest three arrays deep, and warnings are CAP XML.
+    So every project that wants BMKG data writes the same parsing again — and then each copy
+    drifts, and each copy has to be fixed separately when BMKG changes something.</p>
+    <p><strong>This is that parsing, done once, in one place.</strong> A project gets typed JSON
+    and has nothing of its own to maintain. When BMKG moves, one repo changes.</p>
+    <p>The off-the-shelf alternative was a Python wrapper whose hosting lapsed — its demo answers
+    <code>503 DEPLOYMENT_PAUSED</code> and its MCP server proxies every tool call to that dead
+    demo. Depending on someone else's free tier is the thing this avoids: no origin server, no
+    paid plan, no machine to keep awake. One Cloudflare Worker serves the API, the MCP endpoint
+    and this page.</p>
   </div>
 </section>
 
@@ -319,14 +324,46 @@ footer p{color:var(--ink-3); font-size:14px}
 
 <section>
   <div class="wrap">
-    <h2>Self-host it</h2>
-    <p>It is one Worker and one D1 database. Both fit inside Cloudflare's free tier.</p>
-<pre><code>git clone https://github.com/galohot/bmkg-edge
-cd bmkg-edge
-cp wrangler.example.toml wrangler.toml     # add your account and D1 ids
-python3 tools/build-wilayah.py             # build the region seed
-make seed                                  # load it into D1
-make deploy</code></pre>
+    <h2>Use it from a project</h2>
+    <p>Copy <code>client/bmkg.ts</code> from the repo. Zero dependencies, no build step, works in
+    a Worker, a browser and Node 18+.</p>
+<pre><code>import { createBmkg } from "./bmkg";
+
+const bmkg = createBmkg();
+
+const quake = await bmkg.earthquake.latest();
+quake.magnitude;            // 6.2 — a number, not "6.2"
+
+const w = await bmkg.weather.find("tebet");
+w.matched.path;             // "…› Tebet › Tebet Barat"
+w.forecast.slots[0].temperature_c;</code></pre>
+
+    <h3>From another Cloudflare Worker</h3>
+    <p>Bind to it as a service and the call never leaves the edge — no public round trip, no DNS,
+    no TLS handshake.</p>
+<pre><code># the consumer's wrangler.toml
+[[services]]
+binding = "BMKG"
+service = "bmkg-edge"</code></pre>
+<pre><code>const bmkg = createBmkg({ fetcher: env.BMKG });</code></pre>
+
+    <h3>Failures are typed</h3>
+<pre><code>try {
+  await bmkg.weather.byCode("99.99.99.9999");
+} catch (e) {
+  if (e instanceof BmkgError &amp;&amp; e.isMissingUpstream) { /* valid code, BMKG has no data */ }
+  if (e instanceof BmkgError &amp;&amp; e.isSchemaDrift)     { /* BMKG moved — bmkg-edge needs a fix */ }
+}</code></pre>
+
+    <h3>Watching it</h3>
+    <p><a href="/health/deep">/health/deep</a> exercises every upstream and reports each one.
+    It answers <code>503</code> when any source fails, so a cron can watch one URL. That is the
+    failure that matters here — not the Worker going down, but BMKG changing a payload while
+    every response stays <code>200</code>.</p>
+
+    <h3>Self-hosting</h3>
+    <p>One Worker and one D1 database, both inside Cloudflare's free tier. Steps are in the
+    <a href="https://github.com/galohot/bmkg-edge">repo README</a>.</p>
   </div>
 </section>
 

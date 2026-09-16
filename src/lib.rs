@@ -84,6 +84,7 @@ async fn route(mut req: Request, env: Env) -> Result<Response> {
     match segments.as_slice() {
         [] => landing::page(),
         ["health"] => health(),
+        ["health", "deep"] => health_deep().await,
         ["mcp"] => mcp_probe(),
         ["v1", "openapi.json"] => openapi::document(),
 
@@ -270,6 +271,63 @@ fn health() -> Result<Response> {
         "bmkg-edge",
         0,
     )
+}
+
+/// Exercise every upstream and report which ones answered.
+///
+/// `/health` says the Worker is alive; this says the *data* is alive. It exists because
+/// other projects depend on this service, and the failure that matters is not the Worker
+/// going down — it is BMKG changing a payload while every response stays HTTP 200. Point a
+/// cron at this and read `ok`.
+async fn health_deep() -> Result<Response> {
+    let mut checks = Vec::new();
+    let mut all_ok = true;
+
+    macro_rules! probe {
+        ($name:expr, $call:expr) => {{
+            let started = worker::js_sys::Date::now();
+            let (ok, detail) = match $call {
+                Ok(v) => (true, format!("{} item(s)", v)),
+                Err(e) => (false, format!("{}: {}", e.code(), e.message())),
+            };
+            all_ok &= ok;
+            checks.push(serde_json::json!({
+                "source": $name,
+                "ok": ok,
+                "detail": detail,
+                "ms": (worker::js_sys::Date::now() - started).round(),
+            }));
+        }};
+    }
+
+    probe!("earthquake/latest", earthquake::latest().await.map(|_| 1));
+    probe!(
+        "earthquake/recent",
+        earthquake::recent().await.map(|v| v.len())
+    );
+    probe!("earthquake/felt", earthquake::felt().await.map(|v| v.len()));
+    probe!(
+        "weather/forecast",
+        weather::forecast("31.74.04.1006")
+            .await
+            .map(|f| f.slots.len())
+    );
+    probe!("nowcast/index", nowcast::index("en").await.map(|v| v.len()));
+
+    // Stays inside the standard envelope — one contract, no exceptions. The health verdict
+    // is `healthy`, not `ok`: `ok` already means "the request succeeded", and overloading it
+    // to also mean "the data is fine" would make two different things read the same key.
+    // A watchdog can read either `data.healthy` or the HTTP status.
+    let payload = serde_json::json!({
+        "healthy": all_ok,
+        "version": VERSION,
+        "checks": checks,
+    });
+    let mut res = json_ok(payload, "bmkg-edge", 0)?;
+    if !all_ok {
+        res = res.with_status(503);
+    }
+    Ok(res)
 }
 
 /// A GET on /mcp is a client checking whether the endpoint exists. Say what it is

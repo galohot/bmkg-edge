@@ -1,9 +1,10 @@
 # bmkg-edge
 
-**BMKG's Indonesian open data as a typed JSON API, plus an MCP endpoint, on one Cloudflare Worker.**
+**The shared BMKG layer for our projects.** Indonesian earthquake, weather and
+severe-weather-warning data, plus the full region-code tree — parsed once, here, so nothing
+downstream parses it again.
 
-Earthquakes, weather forecasts, severe-weather warnings and the full Indonesian region-code
-tree. No API key, no account, CORS open.
+One Cloudflare Worker (Rust → WASM) serving a REST API, an MCP endpoint and a TypeScript client.
 
 **Live:** https://bmkg.irawan.dev · [OpenAPI](https://bmkg.irawan.dev/v1/openapi.json)
 
@@ -16,13 +17,16 @@ curl https://bmkg.irawan.dev/v1/nowcast
 ## Why
 
 BMKG publishes its data openly, but raw. Magnitudes arrive as strings, one field holds
-`"lat,lon"` as text, forecasts nest three arrays deep, and warnings are CAP XML. Every
-consumer writes the same parsing code.
+`"lat,lon"` as text, forecasts nest three arrays deep, and warnings are CAP XML.
 
-Existing wrappers solved that and then their hosting lapsed. This one is built so there is
-nothing to lapse: **no origin server, no paid plan, no machine that has to stay awake.** One
-Worker serves the REST API, the MCP endpoint and the documentation page. Everything fits
-inside Cloudflare's free tier.
+So every project that wants BMKG data writes the same parsing again. Then each copy drifts,
+and each copy has to be fixed separately when BMKG changes something. **This is that parsing,
+done once, in one place.** A consumer gets typed JSON and has nothing of its own to maintain.
+
+The off-the-shelf option was a Python wrapper whose hosting lapsed — its demo returns
+`503 DEPLOYMENT_PAUSED`, and its MCP server proxies every tool call to that dead demo.
+Depending on someone else's free tier is exactly what this avoids: **no origin server, no paid
+plan, no machine that has to stay awake.** Everything fits inside Cloudflare's free tier.
 
 ## What you get
 
@@ -70,6 +74,75 @@ inside Cloudflare's free tier.
 
 ### Meta
 `GET /health` · `GET /v1/openapi.json` · `POST /mcp`
+
+## Using it
+
+Copy [`client/bmkg.ts`](client/bmkg.ts) into the consuming project. Zero dependencies, no build
+step, works in a Cloudflare Worker, a browser and Node 18+. It is written without TypeScript
+parameter properties so it runs under type-stripping toolchains too
+(`node --experimental-strip-types`, esbuild, any bundler).
+
+```ts
+import { createBmkg, BmkgError } from "./bmkg";
+
+const bmkg = createBmkg();
+
+const quake = await bmkg.earthquake.latest();
+quake.magnitude;              // 6.2 — a number
+quake.depth_km;               // 145 — a number
+
+const w = await bmkg.weather.find("tebet");
+w.matched.path;               // "…› Tebet › Tebet Barat"
+w.alternatives;               // what else the name could have meant
+w.forecast.slots[0].temperature_c;
+
+const near = await bmkg.earthquake.nearby({ lat: -6.2, lon: 106.8, radiusKm: 800 });
+near[0].distance_km;
+```
+
+### From another Cloudflare Worker
+
+Bind to it as a service. The call never leaves the edge — no public round trip, no DNS lookup,
+no TLS handshake.
+
+```toml
+# the consumer's wrangler.toml
+[[services]]
+binding = "BMKG"
+service = "bmkg-edge"
+```
+
+```ts
+const bmkg = createBmkg({ fetcher: env.BMKG });
+```
+
+### Failures are typed
+
+```ts
+try {
+  await bmkg.weather.byCode("99.99.99.9999");
+} catch (e) {
+  if (e instanceof BmkgError) {
+    e.code;                 // "upstream_not_found"
+    e.isMissingUpstream;    // valid code, BMKG has no data for it
+    e.isSchemaDrift;        // BMKG moved — this repo needs a fix, not the caller
+  }
+}
+```
+
+### Watching it
+
+`GET /health/deep` exercises every upstream and reports each one, answering `503` if any fails:
+
+```json
+{ "ok": true, "data": { "healthy": true, "checks": [
+  { "source": "earthquake/latest", "ok": true, "detail": "1 item(s)",  "ms": 6 },
+  { "source": "weather/forecast",  "ok": true, "detail": "20 item(s)", "ms": 278 }
+] } }
+```
+
+That is the failure mode that matters once projects depend on this: not the Worker going down,
+but BMKG changing a payload while every response stays `200`. Point a cron at one URL.
 
 ## The Papua problem
 
@@ -174,6 +247,19 @@ About 2,300 lines of Rust. The bundle is 802 KB of wasm — 281 KB gzipped — a
 Region search uses a token table rather than `LIKE '%x%'`: a full scan would read 91,599 rows
 per query, and D1's free tier is billed in rows read, so that would run out at around 55
 searches a day.
+
+## What it replaces
+
+Nothing is migrated yet — this is the layer, not the migration. The duplication it exists to
+remove, measured in the sibling projects:
+
+| Where | Lines | Doing |
+|---|---|---|
+| `cakrawala/worker/sources/gempa.ts` | 106 | Its own `BmkgGempa` type, regex number-stripper, coordinate split |
+| `cakrawala/worker/sources/cuaca.ts` | 100 | The same again for forecasts |
+| `gempa-cek/src/index.js` | — | Parses `autogempa` and `gempaterkini` a third time |
+
+Each of those is a separate copy that has to be fixed separately when BMKG moves.
 
 ## Attribution and limits
 

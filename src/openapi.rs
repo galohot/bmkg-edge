@@ -21,12 +21,13 @@ const SPEC: &str = r##"{
   "info": {
     "title": "bmkg-edge",
     "version": "{{VERSION}}",
-    "description": "BMKG open data as a typed JSON API. Earthquakes, weather forecasts, severe-weather warnings and Indonesian region codes. No key, no account, CORS open. Every response is {ok,data,meta} or {ok,error}.",
+    "description": "The shared BMKG layer: earthquakes, weather forecasts, severe-weather warnings and Indonesian region codes, parsed once so consumers do not parse them again. No key, no account, CORS open. Every response is {ok,data,meta} or {ok,error}. A TypeScript client lives at client/bmkg.ts in the repo.",
     "license": { "name": "MIT" }
   },
   "servers": [{ "url": "https://bmkg.irawan.dev" }],
   "paths": {
     "/health": { "get": { "summary": "Liveness and version", "responses": { "200": { "description": "ok" } } } },
+    "/health/deep": { "get": { "summary": "Exercise every upstream; 503 if any source fails", "responses": { "200": { "description": "all sources answered" }, "503": { "description": "at least one source failed" } } } },
     "/v1/earthquake/latest": { "get": { "summary": "Most recent earthquake", "responses": { "200": { "description": "ok" } } } },
     "/v1/earthquake/recent": { "get": { "summary": "Last 15 quakes of M5.0+", "responses": { "200": { "description": "ok" } } } },
     "/v1/earthquake/felt": { "get": { "summary": "Quakes people reported feeling", "responses": { "200": { "description": "ok" } } } },
